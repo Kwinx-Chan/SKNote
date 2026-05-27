@@ -1,22 +1,1380 @@
-const CACHE_NAME = 'schedule-v1';
-const urlsToCache = [
-  './',
-  './index.html',
-  './manifest.json',
-  './icon-192.png',
-  './icon-512.png',
-  './IMG_5377.jpg',
-  './IMG_5378.jpg'
-];
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>智能日程本</title>
+    <!-- PWA 配置 -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="日程本">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <style>
+        :root {
+            --bg: #ffffff;
+            --fg: #0f172a;
+            --muted: #64748b;
+            --card: rgba(255, 255, 255, 0.85);
+            --border: rgba(230, 230, 240, 0.6);
+            --input-bg: #ffffffcc;
+            --input-border: #e2e8f0;
+            --item-bg: #f8fafc;
+            --hover: #f1f5f9;
+            --shadow: rgba(0, 0, 0, 0.05);
+            --accent-blue: #3b82f6;
+            --accent-green: #34c759;
+            --accent-red: #ef4444;
+            --accent-yellow: #fde047;
+            --score-bg: #fef9e3;
+            --score-hover: #fde68a;
+            --score-text: #c26b00;
+            --modal-bg: rgba(0,0,0,0.4);
+        }
+        body.dark-mode {
+            --bg: #0f172a;
+            --fg: #f1f5f9;
+            --muted: #94a3b8;
+            --card: rgba(15, 23, 42, 0.9);
+            --border: rgba(51, 65, 85, 0.6);
+            --input-bg: rgba(30, 41, 59, 0.8);
+            --input-border: #334155;
+            --item-bg: #1e293b;
+            --hover: #334155;
+            --shadow: rgba(0, 0, 0, 0.3);
+            --score-bg: #451a03;
+            --score-hover: #78350f;
+            --score-text: #fbbf24;
+            --modal-bg: rgba(0,0,0,0.6);
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            background: var(--bg);
+            color: var(--fg);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.3s, color 0.3s;
+        }
+        button, .mode-btn, .nav-btn, .day-action-btn, .score-area, .recharge-card, .calendar-day, .memo-item, .reminder-item, .confirm-pay-btn, .delete-btn, .request-perm-btn, input, .datetime-input, select, .cat-btn, .setting-row {
+            transition: all 0.2s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+            cursor: pointer;
+        }
+        button:hover, .mode-btn:hover, .nav-btn:hover, .day-action-btn:hover, .score-area:hover, .recharge-card:hover, .calendar-day:hover, .confirm-pay-btn:hover, .delete-btn:hover, .request-perm-btn:hover, .cat-btn:hover {
+            transform: scale(0.98);
+        }
+        .calendar-day:hover {
+            border: 2px solid #cbd5e1 !important;
+            background: var(--hover);
+        }
+        .glass-card {
+            max-width: 1300px;
+            width: 100%;
+            background: var(--card);
+            backdrop-filter: blur(12px);
+            border-radius: 3rem;
+            box-shadow: 0 20px 40px var(--shadow), 0 4px 12px var(--shadow);
+            border: 1px solid var(--border);
+            overflow: hidden;
+            position: relative;
+        }
+        .top-bar {
+            padding: 1rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+            background: var(--hover);
+            border-bottom: 0.5px solid var(--input-border);
+        }
+        .mode-buttons {
+            display: flex;
+            gap: 0.5rem;
+            background: var(--hover);
+            padding: 0.25rem;
+            border-radius: 60px;
+        }
+        .mode-btn {
+            padding: 0.5rem 1.2rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border: none;
+            background: transparent;
+            border-radius: 40px;
+            color: var(--fg);
+        }
+        .mode-btn.active {
+            background: var(--bg);
+            color: var(--accent-blue);
+            box-shadow: 0 2px 8px var(--shadow);
+        }
+        .mode-btn:hover:not(.active) {
+            background: var(--input-border);
+        }
+        .mode-btn.active:hover {
+            background: var(--hover);
+        }
+        .score-area {
+            background: var(--score-bg);
+            backdrop-filter: blur(4px);
+            padding: 0.4rem 1.2rem;
+            border-radius: 60px;
+            font-weight: 600;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--score-text);
+        }
+        .score-area:hover {
+            filter: brightness(0.95);
+        }
+        .score-value {
+            color: var(--score-text);
+            font-size: 1.2rem;
+            display: inline-block;
+            min-width: 2ch;
+            text-align: center;
+        }
+        .settings-btn {
+            background: var(--hover);
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            color: var(--fg);
+        }
+        .settings-btn:hover {
+            background: var(--input-border);
+        }
+        .search-bar {
+            padding: 0.6rem 2rem 0;
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        .search-input {
+            flex: 1;
+            padding: 0.5rem 1rem;
+            border-radius: 60px;
+            border: 1px solid var(--input-border);
+            background: var(--input-bg);
+            color: var(--fg);
+            font-size: 0.85rem;
+            font-family: inherit;
+            outline: none;
+        }
+        .search-input:focus {
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+        }
+        .search-clear {
+            background: var(--hover);
+            color: var(--muted);
+            border: none;
+            padding: 0.4rem 0.8rem;
+            border-radius: 40px;
+            font-size: 0.8rem;
+        }
+        .search-clear:hover {
+            background: var(--input-border);
+        }
+        .main-content {
+            padding: 1.8rem;
+        }
+        .view {
+            display: none;
+            animation: fadeIn 0.25s ease;
+        }
+        .view.active-view {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.2rem;
+        }
+        .month-year {
+            font-size: 1.3rem;
+            font-weight: 600;
+            background: var(--hover);
+            padding: 0.2rem 1rem;
+            border-radius: 40px;
+            color: var(--fg);
+        }
+        .nav-btn {
+            background: var(--hover);
+            border: none;
+            padding: 0.4rem 0.9rem;
+            border-radius: 40px;
+            font-size: 0.85rem;
+            color: var(--accent-blue);
+        }
+        .nav-btn:hover {
+            background: var(--input-border);
+        }
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            margin-bottom: 0.8rem;
+        }
+        .weekday {
+            text-align: center;
+            font-weight: 500;
+            font-size: 0.8rem;
+            color: var(--muted);
+            padding: 0.4rem 0;
+        }
+        .calendar-day {
+            aspect-ratio: 1 / 1;
+            background: var(--bg);
+            border-radius: 1.2rem;
+            padding: 0.3rem 0.1rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--input-border);
+            transition: all 0.2s;
+            position: relative;
+            color: var(--fg);
+        }
+        .calendar-day.today {
+            border: 2px solid #93c5fd;
+        }
+        .calendar-day.selected {
+            border: 2px solid var(--accent-yellow);
+        }
+        .calendar-day.other-month {
+            background: var(--hover);
+            color: var(--muted);
+            border-color: var(--hover);
+            opacity: 0.6;
+        }
+        .date-number {
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        .day-action-btn {
+            background: var(--hover);
+            border: none;
+            border-radius: 30px;
+            font-size: 0.65rem;
+            padding: 0.2rem 0.5rem;
+            margin-top: 4px;
+            font-weight: 500;
+            color: var(--fg);
+        }
+        .day-action-btn.checked {
+            background: #dcfce7;
+            color: #15803d;
+        }
+        .day-action-btn.checked:hover {
+            background: #bbf7d0;
+        }
+        .day-action-btn.disabled-btn {
+            background: #dbeafe;
+            color: #1e40af;
+            opacity: 0.8;
+            pointer-events: none;
+        }
+        .day-action-btn:not(.disabled-btn):not(.checked):hover {
+            background: var(--input-border);
+        }
+        .event-badge {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: #f87171;
+            color: white;
+            font-size: 0.6rem;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            pointer-events: none;
+        }
+        .category-bar {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+            align-items: center;
+        }
+        .cat-btn {
+            padding: 0.35rem 0.9rem;
+            border-radius: 40px;
+            border: 1px solid var(--input-border);
+            background: var(--item-bg);
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--fg);
+        }
+        .cat-btn.active {
+            background: var(--accent-blue);
+            color: white;
+            border-color: var(--accent-blue);
+        }
+        .cat-add-btn {
+            background: transparent;
+            border: 1px dashed var(--input-border);
+            color: var(--muted);
+            padding: 0.35rem 0.7rem;
+            border-radius: 40px;
+            font-size: 0.8rem;
+        }
+        .section-card {
+            background: var(--card);
+            backdrop-filter: blur(8px);
+            border-radius: 2rem;
+            padding: 1.2rem;
+            border: 1px solid var(--border);
+        }
+        .input-group {
+            display: flex;
+            gap: 0.8rem;
+            margin-bottom: 1.2rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .input-group input, .input-group .datetime-input, .input-group select {
+            flex: 1;
+            padding: 0.8rem 1rem;
+            border-radius: 60px;
+            border: 1px solid var(--input-border);
+            background: var(--input-bg);
+            color: var(--fg);
+            font-size: 0.9rem;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+        .input-group input:focus, .input-group .datetime-input:focus, .input-group select:focus {
+            outline: none;
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+        }
+        .datetime-input {
+            background: var(--input-bg) !important;
+            border-radius: 2rem !important;
+            padding: 0.8rem 1rem !important;
+            font-size: 0.9rem;
+        }
+        button {
+            border: none;
+            padding: 0.7rem 1.3rem;
+            border-radius: 60px;
+            font-weight: 500;
+            color: white;
+        }
+        .list-area {
+            max-height: 360px;
+            overflow-y: auto;
+        }
+        .memo-item, .reminder-item {
+            background: var(--item-bg);
+            border-radius: 1.2rem;
+            padding: 0.8rem 1rem;
+            margin-bottom: 0.6rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid var(--border);
+            gap: 0.5rem;
+        }
+        .memo-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .memo-text {
+            font-weight: 500;
+            word-break: break-all;
+        }
+        .memo-time {
+            font-size: 0.7rem;
+            color: var(--muted);
+            margin-top: 0.2rem;
+        }
+        .memo-cat-tag {
+            display: inline-block;
+            font-size: 0.65rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 40px;
+            background: var(--hover);
+            color: var(--muted);
+            margin-top: 0.3rem;
+            margin-right: 0.3rem;
+        }
+        .reminder-triggered-badge {
+            background: var(--hover);
+            border-radius: 40px;
+            padding: 0.2rem 0.6rem;
+            font-size: 0.7rem;
+            margin-left: 0.5rem;
+        }
+        .reminder-triggered-badge.pending {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        .delete-btn, .edit-btn {
+            background: transparent;
+            color: var(--accent-red);
+            padding: 0.2rem 0.7rem;
+            box-shadow: none;
+            font-size: 0.85rem;
+        }
+        .delete-btn:hover {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+        .edit-btn {
+            color: var(--accent-blue);
+        }
+        .edit-btn:hover {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+        .request-perm-btn {
+            background: #86efac !important;
+            color: #14532d;
+            margin-bottom: 0.8rem;
+            width: 100%;
+        }
+        .request-perm-btn:hover {
+            background: #6ee7b7 !important;
+        }
+        .add-reminder-btn {
+            background: #7aa2f7 !important;
+        }
+        .add-reminder-btn:hover {
+            background: #5b8def !important;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 2rem 1rem;
+            color: var(--muted);
+        }
+        .empty-icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 1rem;
+            background: var(--hover);
+            border-radius: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+        }
+        footer {
+            text-align: center;
+            font-size: 0.7rem;
+            color: var(--muted);
+            padding: 0.8rem;
+            border-top: 0.5px solid var(--border);
+            margin-top: 0.8rem;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--modal-bg);
+            backdrop-filter: blur(6px);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal.active {
+            display: flex;
+        }
+        .modal-content {
+            background: var(--card);
+            backdrop-filter: blur(20px);
+            border-radius: 2.5rem;
+            max-width: 500px;
+            width: 90%;
+            padding: 1.5rem;
+            box-shadow: 0 20px 40px var(--shadow);
+            border: 1px solid var(--border);
+            animation: modalIn 0.3s ease;
+            color: var(--fg);
+        }
+        @keyframes modalIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+        .close-modal {
+            background: none;
+            border: none;
+            font-size: 1.6rem;
+            cursor: pointer;
+            color: var(--muted);
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+        .close-modal:hover {
+            background: var(--hover);
+            transform: scale(0.95);
+        }
+        .recharge-options {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .recharge-card {
+            background: var(--hover);
+            border-radius: 1.5rem;
+            padding: 0.8rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+        .recharge-card:hover {
+            background: var(--input-border);
+        }
+        .recharge-price {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #d97706;
+        }
+        .qr-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(12px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1100;
+            animation: fadeIn 0.2s ease;
+        }
+        .qr-card {
+            background: var(--card);
+            border-radius: 2rem;
+            padding: 1.5rem;
+            text-align: center;
+            max-width: 320px;
+            width: 85%;
+            border: 1px solid var(--border);
+            animation: modalIn 0.3s ease;
+            color: var(--fg);
+        }
+        .qr-img {
+            width: 100%;
+            max-width: 200px;
+            margin: 1rem auto;
+            border-radius: 1rem;
+            display: block;
+        }
+        .confirm-pay-btn {
+            background: #34c759;
+            margin-top: 1rem;
+            width: 100%;
+        }
+        .confirm-pay-btn:hover {
+            background: #2ecc71;
+        }
+        .note {
+            font-size: 0.7rem;
+            color: var(--muted);
+            text-align: center;
+            margin-top: 0.8rem;
+        }
+        .reminder-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--hover);
+            padding: 0.2rem 0.8rem;
+            border-radius: 40px;
+            font-size: 0.8rem;
+            color: var(--fg);
+        }
+        .repeat-select {
+            padding: 0.5rem 0.8rem !important;
+            border-radius: 40px !important;
+            font-size: 0.85rem !important;
+        }
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.8rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .setting-label {
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+        .setting-desc {
+            font-size: 0.75rem;
+            color: var(--muted);
+            margin-top: 0.15rem;
+        }
+        .toggle-switch {
+            width: 44px;
+            height: 24px;
+            background: var(--input-border);
+            border-radius: 12px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .toggle-switch.on {
+            background: var(--accent-blue);
+        }
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.2s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .toggle-switch.on::after {
+            transform: translateX(20px);
+        }
+        .lang-select {
+            padding: 0.4rem 0.8rem;
+            border-radius: 40px;
+            border: 1px solid var(--input-border);
+            background: var(--input-bg);
+            color: var(--fg);
+            font-family: inherit;
+            font-size: 0.85rem;
+        }
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
+        }
+        .toast {
+            background: var(--card);
+            color: var(--fg);
+            border-radius: 1rem;
+            padding: 0.8rem 1.2rem;
+            box-shadow: 0 10px 25px var(--shadow);
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            animation: toastSlide 0.3s ease;
+            pointer-events: auto;
+            max-width: 300px;
+        }
+        @keyframes toastSlide {
+            from { opacity: 0; transform: translateX(100%); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .toast.success { border-left: 4px solid #34c759; }
+        .toast.error { border-left: 4px solid #ef4444; }
+        .toast.warning { border-left: 4px solid #f59e0b; }
+        .toast.info { border-left: 4px solid #3b82f6; }
+        .confirm-modal .modal-content {
+            max-width: 360px;
+            text-align: center;
+        }
+        .confirm-buttons {
+            display: flex;
+            gap: 0.8rem;
+            margin-top: 1.2rem;
+            justify-content: center;
+        }
+        .btn-secondary {
+            background: var(--hover);
+            color: var(--fg);
+        }
+        .btn-secondary:hover {
+            background: var(--input-border);
+        }
+        .btn-danger {
+            background: #ef4444;
+        }
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+        .data-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            justify-content: center;
+        }
+        .data-actions button {
+            background: var(--hover);
+            color: var(--fg);
+            font-size: 0.8rem;
+            padding: 0.4rem 0.8rem;
+        }
+        .data-actions button:hover {
+            background: var(--input-border);
+        }
+        @media (max-width: 640px) {
+            .main-content { padding: 1rem; }
+            .calendar-grid { gap: 5px; }
+            .day-action-btn { font-size: 0.6rem; padding: 0.1rem 0.4rem; }
+            .input-group { flex-direction: column; align-items: stretch; }
+            .search-bar { padding: 0.5rem 1rem 0; }
+            .top-bar { padding: 0.8rem 1rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="glass-card">
+    <div class="top-bar">
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+            <div class="mode-buttons">
+                <button class="mode-btn active" data-view="calendar">日历</button>
+                <button class="mode-btn" data-view="memo">备忘录</button>
+                <button class="mode-btn" data-view="reminder">提醒</button>
+            </div>
+        </div>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+            <div class="score-area" id="scoreArea">
+                🎖️ 积分 <span class="score-value" id="scoreValue">0</span>
+                <span style="font-size:0.7rem;">▼ 充值</span>
+            </div>
+            <button class="settings-btn" id="settingsBtn" title="设置">⚙️</button>
+        </div>
+    </div>
 
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
-  );
-});
+    <div class="search-bar" id="searchBar" style="display:none;">
+        <input type="text" class="search-input" id="globalSearch" placeholder="搜索备忘录和提醒...">
+        <button class="search-clear" id="clearSearch">清空</button>
+    </div>
 
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request).then(response => response || fetch(event.request))
-  );
-});
+    <div class="main-content">
+        <!-- 日历视图 -->
+        <div id="calendarView" class="view active-view">
+            <div class="calendar-header">
+                <button class="nav-btn" id="prevMonthBtn">◀ 上月</button>
+                <span class="month-year" id="monthYear"></span>
+                <button class="nav-btn" id="nextMonthBtn">下月 ▶</button>
+            </div>
+            <div class="calendar-grid" id="calendarGrid"></div>
+            <footer>签到+10积分 · 补签-30积分 · 点击日期可填充提醒时间</footer>
+        </div>
+
+        <!-- 备忘录视图 -->
+        <div id="memoView" class="view">
+            <div class="section-card">
+                <div class="category-bar" id="categoryBar"></div>
+                <div class="input-group">
+                    <input type="text" id="memoInput" placeholder="写备忘录...">
+                    <select id="memoCategory" style="flex:0 0 auto; min-width:100px;"></select>
+                    <div class="reminder-checkbox">
+                        <input type="checkbox" id="memoRemindCheckbox">
+                        <label for="memoRemindCheckbox">添加提醒</label>
+                    </div>
+                    <input type="datetime-local" id="memoRemindTime" class="datetime-input" style="display:none;">
+                    <button id="addMemoBtn">添加</button>
+                </div>
+                <div class="list-area" id="memoList"></div>
+                <div class="note">勾选"添加提醒"后选择未来时间，到点弹窗通知</div>
+                <div class="data-actions">
+                    <button id="exportMemoBtn">📥 导出备份</button>
+                    <button id="importMemoBtn">📤 导入恢复</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 提醒视图 -->
+        <div id="reminderView" class="view">
+            <div class="section-card">
+                <button id="requestNotifyBtn" class="request-perm-btn">🔔 允许通知</button>
+                <div class="input-group">
+                    <select id="reminderSource" style="flex:0 0 auto; min-width:120px;">
+                        <option value="manual">手动输入</option>
+                        <option value="memo">来自备忘录</option>
+                    </select>
+                    <input type="text" id="reminderTitle" placeholder="提醒事项...">
+                    <select id="reminderMemoSelect" style="display:none; flex:1;"></select>
+                    <input type="datetime-local" id="reminderDateTime" class="datetime-input">
+                    <select id="reminderRepeat" class="repeat-select">
+                        <option value="none">仅一次</option>
+                        <option value="daily">每天</option>
+                        <option value="weekly">每周</option>
+                        <option value="workday">工作日</option>
+                    </select>
+                    <button id="addReminderBtn" class="add-reminder-btn">添加提醒</button>
+                </div>
+                <div style="margin-bottom:0.5rem; font-weight:500;">提醒列表（触发后保留）</div>
+                <div class="list-area" id="reminderList"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 充值模态框 -->
+<div id="rechargeModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span>选择充值套餐</span>
+            <button class="close-modal" id="closeModalBtn">&times;</button>
+        </div>
+        <div class="recharge-options">
+            <div class="recharge-card" data-points="10" data-price="1">
+                <div><span class="recharge-price">10 积分</span><div class="note">¥1.00</div></div>
+                <span style="color:#3b82f6;">点击选择 →</span>
+            </div>
+            <div class="recharge-card" data-points="110" data-price="10">
+                <div><span class="recharge-price">110 积分</span><div class="note">¥10.00 (赠送10)</div></div>
+                <span style="color:#3b82f6;">点击选择 →</span>
+            </div>
+        </div>
+        <div class="note">点击套餐，扫码支付后确认增加积分</div>
+    </div>
+</div>
+
+<!-- 设置模态框 -->
+<div id="settingsModal" class="modal">
+    <div class="modal-content" style="max-width:420px;">
+        <div class="modal-header">
+            <span>设置</span>
+            <button class="close-modal" id="closeSettingsBtn">&times;</button>
+        </div>
+        <div class="setting-row">
+            <div>
+                <div class="setting-label">语言</div>
+                <div class="setting-desc">切换界面显示语言</div>
+            </div>
+            <select class="lang-select" id="langSelect">
+                <option value="zh">中文</option>
+                <option value="en">English</option>
+            </select>
+        </div>
+        <div class="setting-row">
+            <div>
+                <div class="setting-label">暗黑模式</div>
+                <div class="setting-desc">切换明亮/暗黑主题</div>
+            </div>
+            <div class="toggle-switch" id="darkModeToggle"></div>
+        </div>
+        <div class="setting-row" style="border-bottom:none;">
+            <div>
+                <div class="setting-label">允许通知</div>
+                <div class="setting-desc">开启后接收提醒弹窗与音效</div>
+            </div>
+            <div class="toggle-switch" id="notifyToggle"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 确认对话框 -->
+<div id="confirmModal" class="modal confirm-modal">
+    <div class="modal-content">
+        <div id="confirmText" style="font-size:1rem; color:var(--fg);"></div>
+        <div class="confirm-buttons">
+            <button class="btn-secondary" id="confirmCancel">取消</button>
+            <button class="btn-danger" id="confirmOk">确认</button>
+        </div>
+    </div>
+</div>
+
+<!-- 导入对话框 -->
+<div id="importModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span>导入备份数据</span>
+            <button class="close-modal" id="closeImportBtn">&times;</button>
+        </div>
+        <textarea id="importTextarea" style="width:100%; height:120px; border-radius:1rem; border:1px solid var(--input-border); padding:0.8rem; font-family:inherit; resize:none; background:var(--input-bg); color:var(--fg);" placeholder="在此粘贴 JSON 备份数据..."></textarea>
+        <div class="confirm-buttons" style="margin-top:1rem;">
+            <button class="btn-secondary" id="importCancel">取消</button>
+            <button id="importConfirmBtn" style="background:#3b82f6;">确认导入</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+    // ==================== I18N ====================
+    const i18n = {
+        zh: {
+            sign: '签到', makeup: '补签(30)', checked: '已签到', unavailable: '暂不可签',
+            cancel: '删除', edit: '编辑', confirm: '保存',
+            deleteConfirm: '确定删除吗？', makeupConfirm: '补签将消耗30积分，确认吗？',
+            noMemo: '暂无备忘录，添加一条吧~', noReminder: '暂无定时提醒', noSearch: '没有找到匹配项',
+            all: '全部', addCategory: '+ 分类', work: '工作', personal: '个人', shopping: '购物', health: '健康', finance: '财务', uncategorized: '未分类',
+            tabCalendar: '日历', tabMemo: '备忘录', tabReminder: '提醒', points: '积分', recharge: '充值',
+            prevMonth: '上月', nextMonth: '下月', searchPlaceholder: '搜索备忘录和提醒...', clear: '清空',
+            addReminder: '添加提醒', add: '添加', memoPlaceholder: '写备忘录...', memoNote: '勾选"添加提醒"后选择未来时间，到点弹窗通知',
+            export: '📥 导出备份', import: '📤 导入恢复', allowNotify: '允许通知', manualInput: '手动输入', fromMemo: '来自备忘录',
+            reminderPlaceholder: '提醒事项...', once: '仅一次', daily: '每天', weekly: '每周', workday: '工作日',
+            reminderListTitle: '提醒列表（触发后保留）', choosePlan: '选择充值套餐', clickSelect: '点击选择 →', gift: '赠送10',
+            rechargeNote: '点击套餐，扫码支付后确认增加积分', settings: '设置', language: '语言', langDesc: '切换界面显示语言',
+            darkMode: '暗黑模式', darkDesc: '切换明亮/暗黑主题', notifications: '允许通知', notifyDesc: '开启后接收提醒弹窗与音效',
+            importTitle: '导入备份数据', confirmImport: '确认导入', calendarFooter: '签到+10积分 · 补签-30积分 · 点击日期可填充提醒时间',
+            today: '今天'
+        },
+        en: {
+            sign: 'Check-in', makeup: 'Makeup(30)', checked: 'Checked', unavailable: 'Unavailable',
+            cancel: 'Delete', edit: 'Edit', confirm: 'Save',
+            deleteConfirm: 'Delete this item?', makeupConfirm: 'Makeup costs 30pts, confirm?',
+            noMemo: 'No memos yet', noReminder: 'No reminders', noSearch: 'No matches',
+            all: 'All', addCategory: '+ Category', work: 'Work', personal: 'Personal', shopping: 'Shopping', health: 'Health', finance: 'Finance', uncategorized: 'Uncategorized',
+            tabCalendar: 'Calendar', tabMemo: 'Memo', tabReminder: 'Reminder', points: 'Pts', recharge: 'Recharge',
+            prevMonth: 'Prev', nextMonth: 'Next', searchPlaceholder: 'Search...', clear: 'Clear',
+            addReminder: 'Add Reminder', add: 'Add', memoPlaceholder: 'Write memo...', memoNote: 'Check "Add Reminder" and pick future time',
+            export: '📥 Export', import: '📤 Import', allowNotify: 'Allow Notifications', manualInput: 'Manual', fromMemo: 'From Memo',
+            reminderPlaceholder: 'Reminder...', once: 'Once', daily: 'Daily', weekly: 'Weekly', workday: 'Workdays',
+            reminderListTitle: 'Reminders (persist after triggered)', choosePlan: 'Choose Plan', clickSelect: 'Select →', gift: 'Bonus 10',
+            rechargeNote: 'Tap plan, scan QR, then confirm', settings: 'Settings', language: 'Language', langDesc: 'Switch language',
+            darkMode: 'Dark Mode', darkDesc: 'Toggle light/dark theme', notifications: 'Notifications', notifyDesc: 'Enable pop-ups and sound',
+            importTitle: 'Import Backup', confirmImport: 'Import', calendarFooter: 'Check-in +10pts · Makeup -30pts · Tap date to fill time',
+            today: 'Today'
+        }
+    };
+    let currentLang = 'zh';
+    function t(key) { return i18n[currentLang]?.[key] || i18n.zh[key] || key; }
+
+    // ==================== DATA ====================
+    let memos = [];
+    let reminders = [];
+    let checkins = {};
+    let userPoints = 0;
+    let categories = [];
+    let settings = { language: 'zh', darkMode: false, notifications: true };
+
+    let currentYear = new Date().getFullYear();
+    let currentMonth = new Date().getMonth();
+    let selectedDate = new Date();
+    let activeCategory = 'all';
+    let searchQuery = '';
+
+    const autoCatRules = {
+        work: ['会议','工作','项目','deadline','报告','邮件','客户','meeting','work','project','report'],
+        shopping: ['买','购物','超市','下单','采购','shop','buy','order','purchase'],
+        health: ['药','医院','运动','健身','跑步','医生','health','gym','run','doctor','medicine'],
+        finance: ['钱','账单','还款','工资','报销','缴费','money','bill','pay','salary'],
+        personal: ['私事','个人','家庭','休息','娱乐','personal','family','rest']
+    };
+    function autoCategorize(text) {
+        const lower = text.toLowerCase();
+        for (const [cat, keywords] of Object.entries(autoCatRules))
+            if (keywords.some(k => lower.includes(k))) return cat;
+        return 'uncategorized';
+    }
+
+    // DOM
+    const calendarGrid = document.getElementById('calendarGrid');
+    const monthYearSpan = document.getElementById('monthYear');
+    const memoListDiv = document.getElementById('memoList');
+    const reminderListDiv = document.getElementById('reminderList');
+    const memoInput = document.getElementById('memoInput');
+    const memoCategory = document.getElementById('memoCategory');
+    const memoRemindCheckbox = document.getElementById('memoRemindCheckbox');
+    const memoRemindTime = document.getElementById('memoRemindTime');
+    const addMemoBtn = document.getElementById('addMemoBtn');
+    const addReminderBtn = document.getElementById('addReminderBtn');
+    const reminderTitle = document.getElementById('reminderTitle');
+    const reminderDateTime = document.getElementById('reminderDateTime');
+    const reminderRepeat = document.getElementById('reminderRepeat');
+    const reminderSource = document.getElementById('reminderSource');
+    const reminderMemoSelect = document.getElementById('reminderMemoSelect');
+    const requestNotifyBtn = document.getElementById('requestNotifyBtn');
+    const scoreSpan = document.getElementById('scoreValue');
+    const scoreArea = document.getElementById('scoreArea');
+    const rechargeModal = document.getElementById('rechargeModal');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const searchBar = document.getElementById('searchBar');
+    const globalSearch = document.getElementById('globalSearch');
+    const clearSearch = document.getElementById('clearSearch');
+    const categoryBar = document.getElementById('categoryBar');
+
+    // Toast
+    function showToast(msg, type='info', dur=3000) {
+        const c = document.getElementById('toastContainer');
+        const t = document.createElement('div');
+        t.className = `toast ${type}`;
+        t.innerHTML = `<span>${type==='success'?'✅':type==='error'?'❌':type==='warning'?'⚠️':'ℹ️'}</span><span>${escapeHtml(msg)}</span>`;
+        c.appendChild(t);
+        setTimeout(() => { t.style.opacity='0'; t.style.transform='translateX(100%)'; setTimeout(()=>t.remove(),300); }, dur);
+    }
+    function showConfirm(text) { return new Promise(resolve => { let m=document.getElementById('confirmModal'); document.getElementById('confirmText').innerText=text; m.classList.add('active'); let ok=()=>{ m.classList.remove('active'); resolve(true); }; let cancel=()=>{ m.classList.remove('active'); resolve(false); }; document.getElementById('confirmOk').onclick=ok; document.getElementById('confirmCancel').onclick=cancel; }); }
+
+    // Score
+    function updateScoreUI(animate=true) { scoreSpan.innerText = userPoints; }
+    function addPoints(amt) { userPoints += amt; updateScoreUI(true); saveAll(); showToast(`+${amt} ${t('points')}`, 'success'); }
+
+    // Storage
+    function saveAll() {
+        localStorage.setItem('memos_final_v2', JSON.stringify(memos));
+        localStorage.setItem('reminders_final_v2', JSON.stringify(reminders));
+        localStorage.setItem('checkins_final_v2', JSON.stringify(checkins));
+        localStorage.setItem('userPoints_final_v2', userPoints);
+        localStorage.setItem('categories_final_v2', JSON.stringify(categories));
+        localStorage.setItem('settings_final_v2', JSON.stringify(settings));
+    }
+    function loadData() {
+        const s = localStorage.getItem('settings_final_v2');
+        if(s) settings = JSON.parse(s);
+        currentLang = settings.language || 'zh';
+        document.getElementById('langSelect').value = currentLang;
+        const c = localStorage.getItem('categories_final_v2');
+        categories = c ? JSON.parse(c) : ['work','personal','shopping','health','finance'];
+        const m = localStorage.getItem('memos_final_v2');
+        memos = m ? JSON.parse(m) : [];
+        const r = localStorage.getItem('reminders_final_v2');
+        reminders = r ? JSON.parse(r) : [];
+        const ch = localStorage.getItem('checkins_final_v2');
+        checkins = ch ? JSON.parse(ch) : {};
+        const p = localStorage.getItem('userPoints_final_v2');
+        userPoints = p ? parseInt(p) : 0;
+        updateScoreUI(false);
+        applyTheme();
+        saveAll();
+    }
+
+    // Theme
+    function applyTheme() {
+        if(settings.darkMode) document.body.classList.add('dark-mode');
+        else document.body.classList.remove('dark-mode');
+        document.getElementById('darkModeToggle').classList.toggle('on', settings.darkMode);
+        document.getElementById('notifyToggle').classList.toggle('on', settings.notifications);
+    }
+    document.getElementById('settingsBtn').addEventListener('click',()=>document.getElementById('settingsModal').classList.add('active'));
+    document.getElementById('closeSettingsBtn').addEventListener('click',()=>document.getElementById('settingsModal').classList.remove('active'));
+    document.getElementById('langSelect').addEventListener('change',e=>{ currentLang=e.target.value; settings.language=currentLang; saveAll(); applyI18n(); showToast(currentLang==='zh'?'已切换中文':'Switched to English','success'); });
+    document.getElementById('darkModeToggle').addEventListener('click',()=>{ settings.darkMode=!settings.darkMode; saveAll(); applyTheme(); showToast(settings.darkMode?'Dark mode on':'Light mode on','success'); });
+    document.getElementById('notifyToggle').addEventListener('click',()=>{ settings.notifications=!settings.notifications; saveAll(); applyTheme(); showToast(settings.notifications?'Notifications enabled':'Notifications muted','success'); });
+    function applyI18n() {
+        document.querySelectorAll('[data-i18n]').forEach(el => { const key=el.getAttribute('data-i18n'); if(i18n[currentLang][key]) el.innerText=i18n[currentLang][key]; });
+        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { const key=el.getAttribute('data-i18n-placeholder'); if(i18n[currentLang][key]) el.placeholder=i18n[currentLang][key]; });
+        renderCategories(); renderMemoCategoryOptions(); updateReminderMemoSelect();
+    }
+
+    // Categories
+    function getCategoryDisplay(cat) { return i18n[currentLang][cat] || cat; }
+    function renderCategories() {
+        if(!categoryBar) return;
+        let html = `<button class="cat-btn ${activeCategory==='all'?'active':''}" data-cat="all">${t('all')}</button>`;
+        categories.forEach(c => { html += `<button class="cat-btn ${activeCategory===c?'active':''}" data-cat="${c}">${getCategoryDisplay(c)}</button>`; });
+        html += `<button class="cat-add-btn" id="addCatBtn">${t('addCategory')}</button>`;
+        categoryBar.innerHTML = html;
+        categoryBar.querySelectorAll('.cat-btn[data-cat]').forEach(btn => btn.addEventListener('click',()=>{ activeCategory=btn.getAttribute('data-cat'); renderCategories(); renderMemos(); }));
+        document.getElementById('addCatBtn')?.addEventListener('click',async()=>{ let name=prompt(currentLang==='zh'?'输入新分类英文标识':'Enter category ID'); if(name && !categories.includes(name)){ categories.push(name); saveAll(); renderCategories(); renderMemoCategoryOptions(); showToast('OK','success'); } });
+    }
+    function renderMemoCategoryOptions() {
+        if(!memoCategory) return;
+        memoCategory.innerHTML = `<option value="auto">${currentLang==='zh'?'自动分类':'Auto'}</option>` + categories.map(c=>`<option value="${c}">${getCategoryDisplay(c)}</option>`).join('');
+    }
+    function updateReminderMemoSelect() {
+        if(!reminderMemoSelect) return;
+        reminderMemoSelect.innerHTML = `<option value="">${currentLang==='zh'?'-- 选择备忘录 --':'-- Select Memo --'}</option>` + memos.map(m=>`<option value="${m.id}">${escapeHtml(m.text.length>20?m.text.slice(0,20)+'...':m.text)}</option>`).join('');
+    }
+
+    // Calendar helpers
+    function toDateStr(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+    function formatDateTimeLocal(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
+    function formatDateTime(iso) { let d=new Date(iso); if(isNaN(d)) return iso; return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
+    function escapeHtml(str) { return str.replace(/[&<>]/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
+
+    // Sign / Makeup
+    async function signToday() {
+        let todayStr=toDateStr(new Date());
+        if(checkins[todayStr]) { showToast(t('checked')+'!','warning'); return; }
+        userPoints+=10; checkins[todayStr]=true; saveAll(); updateScoreUI(true); renderCalendar();
+        showToast(t('sign')+' +10 '+t('points'),'success');
+    }
+    async function makeUpCheckin(dateObj) {
+        let dateStr=toDateStr(dateObj);
+        if(dateStr===toDateStr(new Date())) { showToast(t('sign')+' '+t('today'),'warning'); return; }
+        if(dateObj>new Date()) { showToast('Future','error'); return; }
+        if(checkins[dateStr]) { showToast(t('checked'),'warning'); return; }
+        if(userPoints<30) { showToast(t('points')+' < 30','error'); return; }
+        if(await showConfirm(t('makeupConfirm'))) { userPoints-=30; checkins[dateStr]=true; saveAll(); updateScoreUI(true); renderCalendar(); showToast(t('makeup')+' '+dateStr,'success'); }
+    }
+
+    // Render Calendar
+    function renderCalendar() {
+        let year=currentYear, month=currentMonth;
+        let firstDay=new Date(year,month,1), startWeekday=firstDay.getDay();
+        let daysInMonth=new Date(year,month+1,0).getDate();
+        let prevDays=new Date(year,month,0).getDate();
+        let todayStr=toDateStr(new Date());
+        monthYearSpan.innerText = `${year}年${month+1}月`;
+        calendarGrid.innerHTML = '';
+        ['日','一','二','三','四','五','六'].forEach(day=>{ let div=document.createElement('div'); div.className='weekday'; div.innerText=day; calendarGrid.appendChild(div); });
+        for(let i=0;i<42;i++) {
+            let dayNum, isCurrent=true, dateObj;
+            if(i<startWeekday) { dayNum=prevDays-(startWeekday-i)+1; isCurrent=false; dateObj=new Date(year,month-1,dayNum); }
+            else if(i>=startWeekday+daysInMonth) { dayNum=i-(startWeekday+daysInMonth)+1; isCurrent=false; dateObj=new Date(year,month+1,dayNum); }
+            else { dayNum=i-startWeekday+1; dateObj=new Date(year,month,dayNum); }
+            let cell=document.createElement('div'); cell.className='calendar-day';
+            if(!isCurrent) cell.classList.add('other-month');
+            let dateStr=toDateStr(dateObj);
+            if(dateStr===todayStr) cell.classList.add('today');
+            if(selectedDate && dateStr===toDateStr(selectedDate)) cell.classList.add('selected');
+            let span=document.createElement('div'); span.className='date-number'; span.innerText=dayNum; cell.appendChild(span);
+            let eventCount = memos.filter(m=>m.remindTime && m.remindTime.startsWith(dateStr)).length + reminders.filter(r=>r.datetime.startsWith(dateStr)).length;
+            if(eventCount>0){ let badge=document.createElement('div'); badge.className='event-badge'; badge.innerText=eventCount>9?'9+':eventCount; cell.appendChild(badge); }
+            let btn=document.createElement('button'); btn.className='day-action-btn';
+            if(checkins[dateStr]) { btn.innerText=t('checked'); btn.disabled=true; btn.classList.add('checked'); }
+            else if(dateStr===todayStr) { btn.innerText=t('sign'); btn.onclick=e=>{ e.stopPropagation(); signToday(); }; }
+            else if(dateObj<new Date() && isCurrent) { btn.innerText=t('makeup'); btn.onclick=e=>{ e.stopPropagation(); makeUpCheckin(dateObj); }; }
+            else { btn.innerText=t('unavailable'); btn.disabled=true; btn.classList.add('disabled-btn'); }
+            cell.appendChild(btn);
+            cell.onclick=()=>{ selectedDate=dateObj; renderCalendar(); if(reminderDateTime) reminderDateTime.value=`${dateStr}T12:00`; };
+            calendarGrid.appendChild(cell);
+        }
+    }
+
+    // Memos
+    function renderMemos() {
+        let display = memos.filter(m => (activeCategory==='all' || m.category===activeCategory) && (!searchQuery || m.text.toLowerCase().includes(searchQuery)));
+        if(display.length===0){ memoListDiv.innerHTML=`<div class="empty-state"><div class="empty-icon">📝</div><div>${searchQuery?t('noSearch'):t('noMemo')}</div></div>`; return; }
+        memoListDiv.innerHTML = display.map(memo=>{
+            let remindHtml = memo.remindTime ? `<div class="memo-time">⏰ ${formatDateTime(memo.remindTime)} ${memo.remindTriggered?'(Done)':'(Pending)'}</div>` : '';
+            let catTag = (memo.category && memo.category!=='uncategorized') ? `<span class="memo-cat-tag">${getCategoryDisplay(memo.category)}</span>` : '';
+            const isEditing = memo._editing;
+            if(isEditing){
+                const hasRemind = !!memo.remindTime;
+                const remindVal = hasRemind ? memo.remindTime : formatDateTimeLocal(new Date(new Date().getTime()+3600000));
+                return `<div class="memo-item editing">
+                            <div class="memo-info">
+                                <input type="text" id="edit-memo-${memo.id}" value="${escapeHtml(memo.text)}" style="width:100%; padding:0.5rem; border-radius:0.5rem; margin-bottom:0.5rem;" onkeypress="if(event.key==='Enter') finishEditMemo(${memo.id})">
+                                <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                                    <select id="edit-cat-${memo.id}" style="padding:0.3rem 0.6rem; border-radius:40px;">${categories.map(c=>`<option value="${c}" ${memo.category===c?'selected':''}>${getCategoryDisplay(c)}</option>`).join('')}</select>
+                                    <label><input type="checkbox" id="edit-remind-check-${memo.id}" ${hasRemind?'checked':''} onchange="toggleEditRemind(${memo.id})"> ${t('addReminder')}</label>
+                                    <input type="datetime-local" id="edit-remind-time-${memo.id}" style="display:${hasRemind?'block':'none'}; padding:0.3rem 0.6rem;" value="${remindVal}">
+                                </div>
+                            </div>
+                            <button class="edit-btn" onclick="finishEditMemo(${memo.id})">${t('confirm')}</button>
+                            <button class="delete-btn" onclick="cancelEditMemo(${memo.id})">${t('cancel')}</button>
+                        </div>`;
+            }
+            return `<div class="memo-item">
+                        <div class="memo-info"><div class="memo-text">${escapeHtml(memo.text)}</div>${catTag}${remindHtml}</div>
+                        <button class="edit-btn" data-id="${memo.id}">${t('edit')}</button>
+                        <button class="delete-btn" data-id="${memo.id}">${t('cancel')}</button>
+                    </div>`;
+        }).join('');
+        document.querySelectorAll('.delete-btn[data-id]').forEach(btn=>btn.addEventListener('click',async(e)=>{ let id=Number(btn.dataset.id); if(await showConfirm(t('deleteConfirm'))){ memos=memos.filter(m=>m.id!==id); saveAll(); renderMemos(); renderCalendar(); updateReminderMemoSelect(); showToast('Deleted','success'); } }));
+        document.querySelectorAll('.edit-btn[data-id]').forEach(btn=>btn.addEventListener('click',e=>{ let id=Number(btn.dataset.id); let memo=memos.find(m=>m.id===id); if(memo){ memo._editing=true; renderMemos(); setTimeout(()=>document.getElementById(`edit-memo-${id}`)?.focus(),50); } }));
+    }
+    window.toggleEditRemind = function(id){ let chk=document.getElementById(`edit-remind-check-${id}`); let ti=document.getElementById(`edit-remind-time-${id}`); if(ti) ti.style.display=chk.checked?'block':'none'; };
+    window.finishEditMemo = function(id){
+        let input=document.getElementById(`edit-memo-${id}`); if(!input) return;
+        let newText=input.value.trim(); if(!newText){ showToast('Empty','error'); return; }
+        let catSel=document.getElementById(`edit-cat-${id}`); let remindChk=document.getElementById(`edit-remind-check-${id}`); let remindTime=document.getElementById(`edit-remind-time-${id}`);
+        let memo=memos.find(m=>m.id===id);
+        if(memo){
+            memo.text=newText;
+            if(catSel) memo.category=catSel.value;
+            if(remindChk && remindChk.checked){
+                let rt=remindTime?.value; if(!rt){ showToast('Pick time','warning'); return; }
+                if(new Date(rt)<=new Date()){ showToast('Future only','error'); return; }
+                memo.remindTime=rt; memo.remindTriggered=false;
+            } else { memo.remindTime=null; memo.remindTriggered=false; }
+            delete memo._editing; saveAll(); renderMemos(); renderCalendar(); updateReminderMemoSelect(); showToast('Saved','success');
+        }
+    };
+    window.cancelEditMemo = function(id){ let memo=memos.find(m=>m.id===id); if(memo){ delete memo._editing; renderMemos(); } };
+    function addMemoWithOption(){
+        let text=memoInput.value.trim(); if(!text){ showToast('Empty','warning'); return; }
+        let category=memoCategory.value; if(category==='auto') category=autoCategorize(text);
+        let remindTime=null;
+        if(memoRemindCheckbox.checked){
+            let rt=memoRemindTime.value; if(!rt){ showToast('Pick time','warning'); return; }
+            if(new Date(rt)<=new Date()){ showToast('Future only','error'); return; }
+            remindTime=rt;
+        }
+        memos.unshift({ id:Date.now(), text, category, remindTime, remindTriggered:false });
+        saveAll(); renderMemos(); renderCalendar(); updateReminderMemoSelect();
+        memoInput.value=''; memoRemindCheckbox.checked=false; memoRemindTime.style.display='none'; memoRemindTime.value=''; showToast('Added','success');
+    }
+
+    // Reminders
+    function renderReminders(){
+        let display=reminders.filter(r=>!searchQuery || r.title.toLowerCase().includes(searchQuery));
+        if(display.length===0){ reminderListDiv.innerHTML=`<div class="empty-state"><div class="empty-icon">⏰</div><div>${searchQuery?t('noSearch'):t('noReminder')}</div></div>`; return; }
+        reminderListDiv.innerHTML = display.map(r=>{
+            let badge=r.triggered?'Done':'Pending';
+            let repeatText=r.repeat && r.repeat!=='none'?` · ${t(r.repeat)}`:'';
+            return `<div class="reminder-item"><div><strong>${escapeHtml(r.title)}</strong> <span class="reminder-triggered-badge">${badge}</span><div style="font-size:0.7rem;">📅 ${formatDateTime(r.datetime)}${repeatText}</div></div><button class="delete-btn" data-rid="${r.id}">${t('cancel')}</button></div>`;
+        }).join('');
+        document.querySelectorAll('.delete-btn[data-rid]').forEach(btn=>btn.addEventListener('click',async(e)=>{ let id=Number(btn.dataset.rid); if(await showConfirm(t('deleteConfirm'))){ reminders=reminders.filter(r=>r.id!==id); saveAll(); renderReminders(); renderCalendar(); showToast('Deleted','success'); } }));
+    }
+    function processRepeat(rem){
+        if(!rem.repeat || rem.repeat==='none') return;
+        let next=new Date(rem.datetime);
+        if(rem.repeat==='daily') next.setDate(next.getDate()+1);
+        else if(rem.repeat==='weekly') next.setDate(next.getDate()+7);
+        else if(rem.repeat==='workday'){ do{ next.setDate(next.getDate()+1); }while(next.getDay()===0 || next.getDay()===6); }
+        reminders.push({ id:Date.now(), title:rem.title, datetime:formatDateTimeLocal(next), triggered:false, repeat:rem.repeat, memoId:rem.memoId });
+    }
+    function addReminder(){
+        let title, memoId=null;
+        if(reminderSource.value==='memo'){
+            let id=reminderMemoSelect.value; if(!id){ showToast('Select a memo','warning'); return; }
+            let memo=memos.find(m=>m.id==id); if(!memo) return;
+            title=memo.text; memoId=memo.id;
+        } else {
+            title=reminderTitle.value.trim(); if(!title){ showToast('Empty','warning'); return; }
+        }
+        let dt=reminderDateTime.value; if(!dt){ showToast('Pick time','warning'); return; }
+        if(new Date(dt)<=new Date()){ showToast('Future only','error'); return; }
+        reminders.push({ id:Date.now(), title, datetime:dt, triggered:false, repeat:reminderRepeat.value, memoId });
+        saveAll(); renderReminders(); renderCalendar();
+        reminderTitle.value=''; reminderDateTime.value=''; reminderRepeat.value='none'; reminderSource.value='manual';
+        reminderTitle.style.display='block'; reminderMemoSelect.style.display='none';
+        showToast('Reminder added','success');
+    }
+    reminderSource.addEventListener('change',()=>{
+        if(reminderSource.value==='memo'){ reminderTitle.style.display='none'; reminderMemoSelect.style.display='block'; updateReminderMemoSelect(); }
+        else { reminderTitle.style.display='block'; reminderMemoSelect.style.display='none'; }
+    });
+
+    // Notification
+    let notifInterval=null;
+    function checkAllReminders(){
+        let now=new Date(), changed=false;
+        reminders.forEach(r=>{ if(!r.triggered && new Date(r.datetime)<=now){ if(settings.notifications && Notification.permission==='granted') new Notification("⏰ "+t('tabReminder'),{body:r.title}); r.triggered=true; processRepeat(r); changed=true; playSound(); showToast(`${t('tabReminder')}: ${r.title}`,'info',4000); } });
+        memos.forEach(m=>{ if(m.remindTime && !m.remindTriggered && new Date(m.remindTime)<=now){ if(settings.notifications && Notification.permission==='granted') new Notification("📝 "+t('tabMemo'),{body:m.text}); m.remindTriggered=true; changed=true; playSound(); showToast(`${t('tabMemo')}: ${m.text}`,'info',4000); } });
+        if(changed){ saveAll(); renderMemos(); renderReminders(); renderCalendar(); }
+    }
+    function playSound(){
+        if(!settings.notifications) return;
+        try{ let ctx=new (window.AudioContext||window.webkitAudioContext)(); let notes=[523.25,659.25,783.99]; notes.forEach((f,i)=>{ let o=ctx.createOscillator(), g=ctx.createGain(); o.connect(g); g.connect(ctx.destination); o.frequency.value=f; o.start(ctx.currentTime+i*0.12); g.gain.setValueAtTime(0.15,ctx.currentTime+i*0.12); g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+i*0.12+0.4); o.stop(ctx.currentTime+i*0.12+0.4); }); }catch(e){}
+    }
+    function startChecker(){ if(notifInterval) clearInterval(notifInterval); notifInterval=setInterval(checkAllReminders,1000); }
+    function requestNotify(){
+        if(!("Notification" in window)){ showToast("Unsupported","error"); return; }
+        if(Notification.permission==="granted") showToast("Already granted","success");
+        else if(Notification.permission!=="denied") Notification.requestPermission().then(p=>{ showToast(p==="granted"?"Granted":"Denied", p==="granted"?"success":"warning"); });
+        else showToast("Blocked manually","warning");
+    }
+
+    // Recharge (original QR images)
+    function showQrModal(points,price){
+        let modalDiv=document.createElement('div'); modalDiv.className='qr-modal';
+        let imgSrc=(price===1)?'IMG_5377.jpg':'IMG_5378.jpg';
+        modalDiv.innerHTML=`<div class="qr-card"><h3>微信扫码支付 ¥${price}.00</h3><img src="${imgSrc}" alt="QR" class="qr-img" onerror="this.src='data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%20viewBox%3D%220%200%20100%20100%22%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20fill%3D%22%23ddd%22%2F%3E%3Ctext%20x%3D%2210%22%20y%3D%2250%22%20fill%3D%22%23999%22%3E%E4%BA%8C%E7%BB%B4%E7%A0%81%E5%8A%A0%E8%BD%BD%E5%A4%B1%E8%B4%A5%3C%2Ftext%3E%3C%2Fsvg%3E'"><button class="confirm-pay-btn" id="confirmPayBtn">我已支付，增加${points}积分</button><div class="note">请完成支付后点击确认</div><button class="close-modal" style="margin-top:0.5rem; background:#aaa;" id="closeQrBtn">关闭</button></div>`;
+        document.body.appendChild(modalDiv);
+        modalDiv.querySelector('#confirmPayBtn').onclick=()=>{ addPoints(points); modalDiv.remove(); };
+        modalDiv.querySelector('#closeQrBtn').onclick=()=>modalDiv.remove();
+        modalDiv.onclick=e=>{ if(e.target===modalDiv) modalDiv.remove(); };
+    }
+    function openRechargeModal(){ rechargeModal.classList.add('active'); }
+    function closeRechargeModal(){ rechargeModal.classList.remove('active'); }
+    function initRechargeEvents(){ document.querySelectorAll('.recharge-card').forEach(c=>c.addEventListener('click',()=>{ let pts=parseInt(c.dataset.points), price=parseInt(c.dataset.price); closeRechargeModal(); showQrModal(pts,price); })); }
+
+    // View switch
+    function switchView(view){
+        document.querySelectorAll('.view').forEach(v=>v.classList.remove('active-view'));
+        document.getElementById(`${view}View`).classList.add('active-view');
+        document.querySelectorAll('.mode-btn').forEach(btn=>{ if(btn.dataset.view===view) btn.classList.add('active'); else btn.classList.remove('active'); });
+        searchBar.style.display = (view==='memo'||view==='reminder')?'flex':'none';
+        if(view==='calendar') renderCalendar();
+        if(view==='memo') { renderCategories(); renderMemos(); }
+        if(view==='reminder') renderReminders();
+    }
+
+    // Export/Import
+    function exportData(){
+        let data={ memos, reminders, checkins, userPoints, categories, settings, exportTime:new Date().toISOString(), version:3 };
+        let a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)])); a.download=`schedule_backup_${toDateStr(new Date())}.json`; a.click(); URL.revokeObjectURL(a.href); showToast('Exported','success');
+    }
+    function importData(json){
+        try{
+            let d=JSON.parse(json);
+            if(!d || typeof d!=='object') throw new Error('Invalid');
+            if(d.memos) memos=d.memos;
+            if(d.reminders) reminders=d.reminders;
+            if(d.checkins) checkins=d.checkins;
+            if(typeof d.userPoints==='number') userPoints=d.userPoints;
+            if(d.categories) categories=d.categories;
+            if(d.settings){ settings=d.settings; currentLang=settings.language||'zh'; }
+            saveAll(); updateScoreUI(false); applyTheme(); applyI18n(); renderMemos(); renderReminders(); renderCalendar(); renderCategories(); showToast('Imported','success');
+        }catch(e){ showToast('Import failed: '+e.message,'error'); }
+    }
+
+    // Events
+    function bindEvents(){
+        document.getElementById('prevMonthBtn').onclick=()=>{ currentMonth--; if(currentMonth<0){ currentMonth=11; currentYear--; } renderCalendar(); };
+        document.getElementById('nextMonthBtn').onclick=()=>{ currentMonth++; if(currentMonth>11){ currentMonth=0; currentYear++; } renderCalendar(); };
+        addMemoBtn.onclick=addMemoWithOption;
+        memoInput.onkeypress=e=>{ if(e.key==='Enter') addMemoWithOption(); };
+        addReminderBtn.onclick=addReminder;
+        requestNotifyBtn.onclick=requestNotify;
+        document.querySelectorAll('.mode-btn').forEach(btn=>btn.addEventListener('click',()=>switchView(btn.dataset.view)));
+        scoreArea.onclick=openRechargeModal;
+        closeModalBtn.onclick=closeRechargeModal;
+        rechargeModal.onclick=e=>{ if(e.target===rechargeModal) closeRechargeModal(); };
+        document.getElementById('exportMemoBtn').onclick=exportData;
+        document.getElementById('importMemoBtn').onclick=()=>{ document.getElementById('importModal').classList.add('active'); document.getElementById('importTextarea').value=''; };
+        document.getElementById('closeImportBtn').onclick=()=>document.getElementById('importModal').classList.remove('active');
+        document.getElementById('importCancel').onclick=()=>document.getElementById('importModal').classList.remove('active');
+        document.getElementById('importConfirmBtn').onclick=()=>{ let txt=document.getElementById('importTextarea').value.trim(); if(txt){ importData(txt); document.getElementById('importModal').classList.remove('active'); } };
+        document.getElementById('importModal').onclick=e=>{ if(e.target===document.getElementById('importModal')) document.getElementById('importModal').classList.remove('active'); };
+        globalSearch.oninput=e=>{ searchQuery=e.target.value.trim().toLowerCase(); let v=document.querySelector('.mode-btn.active')?.dataset.view; if(v==='memo') renderMemos(); if(v==='reminder') renderReminders(); };
+        clearSearch.onclick=()=>{ globalSearch.value=''; searchQuery=''; let v=document.querySelector('.mode-btn.active')?.dataset.view; if(v==='memo') renderMemos(); if(v==='reminder') renderReminders(); };
+        memoRemindCheckbox.onchange=()=>{ memoRemindTime.style.display=memoRemindCheckbox.checked?'block':'none'; if(memoRemindCheckbox.checked && !memoRemindTime.value){ let now=new Date(); now.setHours(now.getHours()+1); memoRemindTime.value=formatDateTimeLocal(now); } };
+        document.addEventListener('keydown',e=>{
+            if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'){ if(e.key==='Escape') e.target.blur(); return; }
+            if(e.key==='1') switchView('calendar'); if(e.key==='2') switchView('memo'); if(e.key==='3') switchView('reminder');
+            if(e.key==='Escape'){ closeRechargeModal(); document.getElementById('confirmModal')?.classList.remove('active'); document.getElementById('importModal')?.classList.remove('active'); document.getElementById('settingsModal')?.classList.remove('active'); }
+        });
+    }
+
+    function init(){
+        loadData(); bindEvents(); initRechargeEvents(); applyI18n(); renderCategories(); renderMemoCategoryOptions(); switchView('calendar'); startChecker();
+        document.addEventListener('visibilitychange',()=>{ if(!document.hidden) checkAllReminders(); });
+        let now=new Date(); if(reminderDateTime) reminderDateTime.value=formatDateTimeLocal(now).slice(0,16);
+        memoRemindTime.style.display='none';
+    }
+    init();
+</script>
+</body>
+</html>
